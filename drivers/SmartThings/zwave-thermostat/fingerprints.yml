@@ -1,4 +1,10 @@
 zwaveManufacturer:
+  - id: "Eurotronic/thermostat/1"
+    deviceLabel: Eurotronic thermostat
+    manufacturerId: 0x0148
+    productType: 0x0003
+    productId: 0x0001
+    deviceProfileName: base-radiator-thermostat
   - id: "honeywell/t6"
     deviceLabel: Honeywell Thermostat
     manufacturerId: 0x0039
