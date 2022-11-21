@@ -24,10 +24,13 @@ local SensorMultilevel = (require "st.zwave.CommandClass.SensorMultilevel")({ver
 --- @type st.zwave.CommandClass.ThermostatSetpoint
 local ThermostatSetpoint = (require "st.zwave.CommandClass.ThermostatSetpoint")({version=1})
 
-local EUROTRONIC_THERMOSTAT_FINGERPRINT = {mfr = 0x0148, prod = 0x0003, model = 0x0001}
+local EUROTRONIC_THERMOSTAT_FINGERPRINT_1 = {mfr = 0x0148, prod = 0x0003, model = 0x0001}
+local EUROTRONIC_THERMOSTAT_FINGERPRINT_2 = {mfr = 0x0148, prod = 0x0003, model = 0x0004}
 
 local function can_handle_eurotronic_radiator_thermostat(opts, driver, device, ...)
-  return device:id_match(EUROTRONIC_THERMOSTAT_FINGERPRINT.mfr, EUROTRONIC_THERMOSTAT_FINGERPRINT.prod, EUROTRONIC_THERMOSTAT_FINGERPRINT.model)
+  return
+    device:id_match(EUROTRONIC_THERMOSTAT_FINGERPRINT_1.mfr, EUROTRONIC_THERMOSTAT_FINGERPRINT_1.prod, EUROTRONIC_THERMOSTAT_FINGERPRINT_1.model) or
+    device:id_match(EUROTRONIC_THERMOSTAT_FINGERPRINT_2.mfr, EUROTRONIC_THERMOSTAT_FINGERPRINT_2.prod, EUROTRONIC_THERMOSTAT_FINGERPRINT_2.model)
 end
 
 local function thermostat_mode_report_handler(self, device, cmd)
