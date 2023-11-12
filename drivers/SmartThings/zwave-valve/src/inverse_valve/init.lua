@@ -13,12 +13,12 @@
 -- limitations under the License.
 
 local capabilities = require "st.capabilities"
---- @type st.zwave.constants
-local constants = require "st.zwave.constants"
 --- @type st.zwave.CommandClass
 local cc = require "st.zwave.CommandClass"
 --- @type st.zwave.CommandClass.SwitchBinary
 local SwitchBinary = (require "st.zwave.CommandClass.SwitchBinary")({ version=2, strict=true })
+--- @type st.zwave.CommandClass.Basic
+local Basic = (require "st.zwave.CommandClass.Basic")({ version=1, strict=true })
 local valve_defaults = require "st.zwave.defaults.valve"
 
 local function open_handler(driver, device, command)
@@ -44,6 +44,9 @@ local inverse_valve = {
   zwave_handlers = {
     [cc.SWITCH_BINARY] = {
       [SwitchBinary.REPORT] = binary_report_handler
+    },
+    [cc.BASIC] = {
+      [Basic.REPORT] = binary_report_handler
     }
   },
   capability_handlers = {

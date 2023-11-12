@@ -1,4 +1,9 @@
 zigbeeManufacturer:
+  - id: "LUMI/lumi.flood.agl02"
+    deviceLabel: Aqara Water Leak Sensor
+    manufacturer: LUMI
+    model: lumi.flood.agl02
+    deviceProfileName: water-battery
   - id: "Heiman/Water/1"
     deviceLabel: Orvibo Water Leak Sensor
     manufacturer: Heiman
@@ -28,6 +33,11 @@ zigbeeManufacturer:
     deviceLabel: Sinope Water Leak Sensor
     manufacturer: Sinope Technologies
     model: WL4200S
+    deviceProfileName: water-temp-battery
+  - id: "Sinope/WL4210"
+    deviceLabel: Sinope Water Leak Sensor
+    manufacturer: Sinope Technologies
+    model: WL4210
     deviceProfileName: water-temp-battery
   - id: "WAXMAN/leakSMART Water Sensor V2"
     deviceLabel: leakSMART Water Leak Sensor

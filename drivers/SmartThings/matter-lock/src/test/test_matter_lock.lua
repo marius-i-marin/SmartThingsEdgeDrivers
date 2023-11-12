@@ -16,14 +16,22 @@ local test = require "integration_test"
 local capabilities = require "st.capabilities"
 local t_utils = require "integration_test.utils"
 local clusters = require "st.matter.clusters"
-local im = require "st.matter.interaction_model"
 
 local mock_device_record = {
   profile = t_utils.get_profile_definition("lock-without-codes.yml"),
   manufacturer_info = {vendor_id = 0x101D, product_id = 0x1},
   endpoints = {
     {
-      endpoint_id = 1,
+      endpoint_id = 2,
+      clusters = {
+        {cluster_id = clusters.Basic.ID, cluster_type = "SERVER"},
+      },
+      device_types = {
+        device_type_id = 0x0016, device_type_revision = 1, -- RootNode
+      }
+    },
+    {
+      endpoint_id = 10,
       clusters = {
         {cluster_id = clusters.DoorLock.ID, cluster_type = "SERVER", feature_map = 0x0000},
         {cluster_id = clusters.PowerSource.ID, cluster_type = "SERVER"},
@@ -60,7 +68,7 @@ test.register_message_test(
     {
       channel = "matter",
       direction = "send",
-      message = {mock_device.id, clusters.DoorLock.server.commands.LockDoor(mock_device, 1)},
+      message = {mock_device.id, clusters.DoorLock.server.commands.LockDoor(mock_device, 10)},
     },
   }
 )
@@ -80,7 +88,7 @@ test.register_message_test(
       direction = "send",
       message = {
         mock_device.id,
-        clusters.DoorLock.server.commands.UnlockDoor(mock_device, 1),
+        clusters.DoorLock.server.commands.UnlockDoor(mock_device, 10),
       },
     },
   }
@@ -94,7 +102,7 @@ test.register_message_test(
       message = {
         mock_device.id,
         clusters.DoorLock.attributes.LockState:build_test_report_data(
-          mock_device, 1, clusters.DoorLock.attributes.LockState.LOCKED
+          mock_device, 10, clusters.DoorLock.attributes.LockState.LOCKED
         ),
       },
     },
@@ -114,7 +122,7 @@ test.register_message_test(
       message = {
         mock_device.id,
         clusters.PowerSource.attributes.BatPercentRemaining:build_test_report_data(
-          mock_device, 1, 150
+          mock_device, 10, 150
         ),
       },
     },
@@ -129,8 +137,8 @@ test.register_message_test(
 )
 
 local function refresh_commands(dev)
-  local req = clusters.DoorLock.attributes.LockState:read(dev, 1)
-  req:merge(clusters.PowerSource.attributes.BatPercentRemaining:read(dev, 1))
+  local req = clusters.DoorLock.attributes.LockState:read(dev)
+  req:merge(clusters.PowerSource.attributes.BatPercentRemaining:read(dev))
   return req
 end
 
@@ -161,7 +169,7 @@ test.register_message_test(
       message = {
         mock_device.id,
         clusters.DoorLock.events.DoorLockAlarm:build_test_event_report(
-          mock_device, 1, {alarm_code = DlAlarmCode.FRONT_ESCEUTCHEON_REMOVED}
+          mock_device, 10, {alarm_code = DlAlarmCode.FRONT_ESCEUTCHEON_REMOVED}
         ),
       },
     },
@@ -176,7 +184,7 @@ test.register_message_test(
       message = {
         mock_device.id,
         clusters.DoorLock.events.DoorLockAlarm:build_test_event_report(
-          mock_device, 1, {alarm_code = DlAlarmCode.WRONG_CODE_ENTRY_LIMIT}
+          mock_device, 10, {alarm_code = DlAlarmCode.WRONG_CODE_ENTRY_LIMIT}
         ),
       },
     },
@@ -191,7 +199,7 @@ test.register_message_test(
       message = {
         mock_device.id,
         clusters.DoorLock.events.DoorLockAlarm:build_test_event_report(
-          mock_device, 1, {alarm_code = DlAlarmCode.FORCED_USER}
+          mock_device, 10, {alarm_code = DlAlarmCode.FORCED_USER}
         ),
       },
     },
@@ -206,7 +214,7 @@ test.register_message_test(
       message = {
         mock_device.id,
         clusters.DoorLock.events.DoorLockAlarm:build_test_event_report(
-          mock_device, 1, {alarm_code = DlAlarmCode.DOOR_FORCED_OPEN}
+          mock_device, 10, {alarm_code = DlAlarmCode.DOOR_FORCED_OPEN}
         ),
       },
     },
@@ -230,7 +238,7 @@ test.register_message_test(
       message = {
         mock_device.id,
         clusters.DoorLock.events.DoorLockAlarm:build_test_event_report(
-          mock_device, 1, {alarm_code = DlAlarmCode.FRONT_ESCEUTCHEON_REMOVED}
+          mock_device, 10, {alarm_code = DlAlarmCode.FRONT_ESCEUTCHEON_REMOVED}
         ),
       },
     },
@@ -244,26 +252,7 @@ test.register_message_test(
       direction = "receive",
       message = {
         mock_device.id,
-        clusters.DoorLock.events.LockOperation:build_test_event_report(mock_device, 1, lock_operation_event),
-      },
-    },
-    {
-      channel = "capability",
-      direction = "send",
-      message = mock_device:generate_test_message("main", capabilities.tamperAlert.tamper.clear()),
-    },
-  }
-)
-
-
-test.register_message_test(
-  "Device added clears tamper alert.", {
-    {
-      channel = "device_lifecycle",
-      direction = "receive",
-      message = {
-        mock_device.id,
-        "added",
+        clusters.DoorLock.events.LockOperation:build_test_event_report(mock_device, 10, lock_operation_event),
       },
     },
     {
@@ -275,12 +264,14 @@ test.register_message_test(
 )
 
 test.register_coroutine_test(
-  "Profile change on doConfigure lifecycle event due to cluster feature map",
+  "Added lifecycle event lock without codes",
   function()
-    test.socket.device_lifecycle:__queue_receive({ mock_device.id, "doConfigure" })
+    test.socket.device_lifecycle:__queue_receive({ mock_device.id, "added" })
 
     mock_device:expect_metadata_update({ profile = "lock-without-codes" })
-    mock_device:expect_metadata_update({ provisioning_state = "PROVISIONED" })
+    test.socket.capability:__expect_send(
+      mock_device:generate_test_message("main", capabilities.tamperAlert.tamper.clear())
+    )
 end
 )
 

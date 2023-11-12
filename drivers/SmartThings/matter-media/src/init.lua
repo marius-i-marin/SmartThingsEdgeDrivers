@@ -12,24 +12,69 @@
 -- See the License for the specific language governing permissions and
 -- limitations under the License.
 
+-- Opportunities for improvement:
+-- * MediaInput cluster could be used to support the MediaSource capability.
+-- * Channel cluster could be used to support the TvChannel capability.
+-- * AdvancedSeek feature support.
 local capabilities = require "st.capabilities"
 local clusters = require "st.matter.clusters"
 local MatterDriver = require "st.matter.driver"
-local utils = require "st.utils"
 
 local VOLUME_STEP = 5
 
+local function find_default_endpoint(device, cluster)
+  local res = device.MATTER_DEFAULT_ENDPOINT
+  local eps = device:get_endpoints(cluster)
+  table.sort(eps)
+  for _, v in ipairs(eps) do
+    if v ~= 0 then --0 is the matter RootNode endpoint
+      return v
+    end
+  end
+  device.log.warn(string.format("Did not find default endpoint, will use endpoint %d instead", device.MATTER_DEFAULT_ENDPOINT))
+  return res
+end
+
+local function component_to_endpoint(device, component_name)
+  -- if this is a speaker device/component, look for endpoint that supports level control (volume)
+  if device:supports_capability(capabilities.audioVolume, component_name) then
+    return find_default_endpoint(device, clusters.LevelControl.ID)
+  else
+    return find_default_endpoint(device, clusters.MediaPlayback.ID)
+  end
+end
+
 local function device_init(driver, device)
+  device:set_component_to_endpoint_fn(component_to_endpoint)
   device:subscribe()
 end
 
 local configure_handler = function(self, device)
-  device:emit_event(capabilities.mediaPlayback.supportedPlaybackCommands({
-    capabilities.mediaPlayback.commands.play.NAME,
-    capabilities.mediaPlayback.commands.pause.NAME,
-    capabilities.mediaPlayback.commands.stop.NAME,
+  local variable_speed_eps = device:get_endpoints(clusters.MediaPlayback.ID, {feature_bitmap = clusters.MediaPlayback.types.MediaPlaybackFeature.VARIABLE_SPEED})
+
+  if #variable_speed_eps > 0 then
+    device:emit_event(capabilities.mediaPlayback.supportedPlaybackCommands({
+      capabilities.mediaPlayback.commands.play.NAME,
+      capabilities.mediaPlayback.commands.pause.NAME,
+      capabilities.mediaPlayback.commands.stop.NAME,
+      capabilities.mediaPlayback.commands.rewind.NAME,
+      capabilities.mediaPlayback.commands.fastForward.NAME
+    }))
+  else
+    device:emit_event(capabilities.mediaPlayback.supportedPlaybackCommands({
+      capabilities.mediaPlayback.commands.play.NAME,
+      capabilities.mediaPlayback.commands.pause.NAME,
+      capabilities.mediaPlayback.commands.stop.NAME
+    }))
+  end
+
+  --Note cluster command support is not checked
+  device:emit_event(capabilities.mediaTrackControl.supportedTrackControlCommands({
+    capabilities.mediaTrackControl.commands.previousTrack.NAME,
+    capabilities.mediaTrackControl.commands.nextTrack.NAME,
   }))
 
+  --Note NV, LK, and NK features are not checked to determine if only a subset of these should be supported
   device:emit_event(capabilities.keypadInput.supportedKeyCodes({
     "UP",
     "DOWN",
@@ -84,7 +129,6 @@ local function media_playback_state_attr_handler(driver, device, ib, response)
     [CurrentState.PLAYING] = attr.playing(),
     [CurrentState.PAUSED] = attr.paused(),
     [CurrentState.NOT_PLAYING] = attr.stopped(),
-    -- TODO: Update to use buffering capability attribute once it is available
     [CurrentState.BUFFERING] = attr.playing()
   }
   if ib.data.value ~= nil then
@@ -171,6 +215,7 @@ local function handle_send_key(driver, device, cmd)
     ["NUMBER8"] = KeyCode.NUMBERS8,
     ["NUMBER9"] = KeyCode.NUMBERS9,
   }
+  --TODO may want to add SendKeyResponse handler to log errors if the cmd fails.
   local req = clusters.KeypadInput.server.commands.SendKey(device, endpoint_id, KEY_MAP[cmd.args.keyCode])
   device:send(req)
 end
@@ -204,7 +249,7 @@ local matter_driver_template = {
       clusters.LevelControl.attributes.CurrentLevel
     },
     [capabilities.mediaPlayback.ID] = {
-      clusters.MediaPlayback.attributes.CurrentState
+      clusters.MediaPlayback.attributes.CurrentState,
     }
   },
   capability_handlers = {
@@ -236,6 +281,14 @@ local matter_driver_template = {
     [capabilities.keypadInput.ID] = {
       [capabilities.keypadInput.commands.sendKey.NAME] = handle_send_key
     }
+  },
+  supported_capabilities = {
+    capabilities.audioMute,
+    capabilities.audioVolume,
+    capabilities.switch,
+    capabilities.mediaPlayback,
+    capabilities.mediaTrackControl,
+    capabilities.keypadInput,
   },
 }
 

@@ -26,17 +26,22 @@ local mock_device = test.mock_device.build_test_matter_device({
   },
   endpoints = {
     {
-      endpoint_id = 1,
+      endpoint_id = 2,
+      clusters = {
+        {cluster_id = clusters.Basic.ID, cluster_type = "SERVER"},
+      },
+      device_types = {
+        device_type_id = 0x0016, device_type_revision = 1, -- RootNode
+      }
+    },
+    {
+      endpoint_id = 10,
       clusters = {
         {
           cluster_id = clusters.OnOff.ID,
           cluster_type = "SERVER",
           cluster_revision = 1,
           feature_map = 0, --u32 bitmap
-          attributes = nil, -- attribute id list
-          server_commands = nil, --server cmd id list
-          client_commands = nil, --client cmd id list
-          events = nil, --event id list
         },
         {cluster_id = clusters.LevelControl.ID, cluster_type = "SERVER"}
       }
@@ -78,7 +83,7 @@ test.register_message_test(
             direction = "send",
             message = {
                 mock_device.id,
-                clusters.OnOff.server.commands.Off(mock_device, 1)
+                clusters.OnOff.server.commands.Off(mock_device, 10)
             }
         },
         {
@@ -94,7 +99,7 @@ test.register_message_test(
             direction = "send",
             message = {
                 mock_device.id,
-                clusters.OnOff.server.commands.On(mock_device, 1)
+                clusters.OnOff.server.commands.On(mock_device, 10)
             }
         },
         {
@@ -102,13 +107,26 @@ test.register_message_test(
             direction = "receive",
             message = {
                 mock_device.id,
-                clusters.OnOff.attributes.OnOff:build_test_report_data(mock_device, 1, true)
+                clusters.OnOff.attributes.OnOff:build_test_report_data(mock_device, 10, true)
             }
         },
         {
             channel = "capability",
             direction = "send",
             message = mock_device:generate_test_message("main", capabilities.audioMute.mute.unmuted())
+        },
+        {
+            channel = "matter",
+            direction = "receive",
+            message = {
+                mock_device.id,
+                clusters.OnOff.attributes.OnOff:build_test_report_data(mock_device, 10, false)
+            }
+        },
+        {
+            channel = "capability",
+            direction = "send",
+            message = mock_device:generate_test_message("main", capabilities.audioMute.mute.muted())
         }
       }
 )
@@ -129,7 +147,7 @@ test.register_message_test(
             direction = "send",
             message = {
                 mock_device.id,
-                clusters.OnOff.server.commands.Off(mock_device, 1)
+                clusters.OnOff.server.commands.Off(mock_device, 10)
             }
         },
         {
@@ -145,7 +163,7 @@ test.register_message_test(
             direction = "send",
             message = {
                 mock_device.id,
-                clusters.OnOff.server.commands.On(mock_device, 1)
+                clusters.OnOff.server.commands.On(mock_device, 10)
             }
         }
     }
@@ -167,7 +185,7 @@ test.register_message_test(
             direction = "send",
             message = {
                 mock_device.id,
-                clusters.LevelControl.server.commands.MoveToLevelWithOnOff(mock_device, 1, math.floor(20/100.0 * 254), 0, 0, 0)
+                clusters.LevelControl.server.commands.MoveToLevelWithOnOff(mock_device, 10, math.floor(20/100.0 * 254), 0, 0, 0)
             }
         },
         {
@@ -175,7 +193,7 @@ test.register_message_test(
             direction = "receive",
             message = {
                 mock_device.id,
-                clusters.LevelControl.server.commands.MoveToLevelWithOnOff:build_test_command_response(mock_device, 1)
+                clusters.LevelControl.server.commands.MoveToLevelWithOnOff:build_test_command_response(mock_device, 10)
             }
         },
         {
@@ -183,7 +201,7 @@ test.register_message_test(
             direction = "receive",
             message = {
                 mock_device.id,
-                clusters.LevelControl.attributes.CurrentLevel:build_test_report_data(mock_device, 1, 50)
+                clusters.LevelControl.attributes.CurrentLevel:build_test_report_data(mock_device, 10, 50)
             }
         },
         {
@@ -210,7 +228,7 @@ test.register_message_test(
             direction = "send",
             message = {
                 mock_device.id,
-                clusters.LevelControl.server.commands.MoveToLevelWithOnOff(mock_device, 1, math.floor(20/100.0 * 254), 0, 0, 0)
+                clusters.LevelControl.server.commands.MoveToLevelWithOnOff(mock_device, 10, math.floor(20/100.0 * 254), 0, 0, 0)
             }
         },
         {
@@ -218,7 +236,7 @@ test.register_message_test(
             direction = "receive",
             message = {
                 mock_device.id,
-                clusters.LevelControl.server.commands.MoveToLevelWithOnOff:build_test_command_response(mock_device, 1)
+                clusters.LevelControl.server.commands.MoveToLevelWithOnOff:build_test_command_response(mock_device, 10)
             }
         },
         {
@@ -226,7 +244,7 @@ test.register_message_test(
             direction = "receive",
             message = {
                 mock_device.id,
-                clusters.LevelControl.attributes.CurrentLevel:build_test_report_data(mock_device, 1, 50 )
+                clusters.LevelControl.attributes.CurrentLevel:build_test_report_data(mock_device, 10, 50 )
             }
         },
         {
@@ -248,7 +266,7 @@ test.register_message_test(
             direction = "send",
             message = {
                 mock_device.id,
-                clusters.LevelControl.server.commands.MoveToLevelWithOnOff(mock_device, 1, math.floor(25/100.0 * 254), 0, 0, 0)
+                clusters.LevelControl.server.commands.MoveToLevelWithOnOff(mock_device, 10, math.floor(25/100.0 * 254), 0, 0, 0)
             }
         },
         {
@@ -256,7 +274,7 @@ test.register_message_test(
             direction = "receive",
             message = {
                 mock_device.id,
-                clusters.LevelControl.server.commands.MoveToLevelWithOnOff:build_test_command_response(mock_device, 1)
+                clusters.LevelControl.server.commands.MoveToLevelWithOnOff:build_test_command_response(mock_device, 10)
             }
         },
         {
@@ -264,7 +282,7 @@ test.register_message_test(
             direction = "receive",
             message = {
                 mock_device.id,
-                clusters.LevelControl.attributes.CurrentLevel:build_test_report_data(mock_device, 1, 63 )
+                clusters.LevelControl.attributes.CurrentLevel:build_test_report_data(mock_device, 10, 63 )
             }
         },
         {
@@ -286,7 +304,7 @@ test.register_message_test(
             direction = "send",
             message = {
                 mock_device.id,
-                clusters.LevelControl.server.commands.MoveToLevelWithOnOff(mock_device, 1, math.floor(20/100.0 * 254), 0, 0, 0)
+                clusters.LevelControl.server.commands.MoveToLevelWithOnOff(mock_device, 10, math.floor(20/100.0 * 254), 0, 0, 0)
             }
         },
         {
@@ -294,7 +312,7 @@ test.register_message_test(
             direction = "receive",
             message = {
                 mock_device.id,
-                clusters.LevelControl.server.commands.MoveToLevelWithOnOff:build_test_command_response(mock_device, 1)
+                clusters.LevelControl.server.commands.MoveToLevelWithOnOff:build_test_command_response(mock_device, 10)
             }
         },
         {
@@ -302,7 +320,7 @@ test.register_message_test(
             direction = "receive",
             message = {
                 mock_device.id,
-                clusters.LevelControl.attributes.CurrentLevel:build_test_report_data(mock_device, 1, 50 )
+                clusters.LevelControl.attributes.CurrentLevel:build_test_report_data(mock_device, 10, 50 )
             }
         },
         {

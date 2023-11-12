@@ -48,10 +48,12 @@ local zigbee_water_driver_template = {
   },
   ias_zone_configuration_method = constants.IAS_ZONE_CONFIGURE_TYPE.AUTO_ENROLL_RESPONSE,
   sub_drivers = {
+    require("aqara"),
     require("zigbee-water-freeze"),
     require("leaksmart"),
     require("frient"),
-    require("thirdreality")
+    require("thirdreality"),
+    require("sinope")
   },
 }
 

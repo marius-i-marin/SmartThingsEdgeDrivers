@@ -12,18 +12,19 @@
 -- See the License for the specific language governing permissions and
 -- limitations under the License.
 
-local capabilities = require "st.capabilities"
 local zcl_commands = require "st.zigbee.zcl.global_commands"
 local multi_utils = require "multi-sensor/multi_utils"
 local zcl_clusters = require "st.zigbee.zcl.clusters"
 local contactSensor_defaults = require "st.zigbee.defaults.contactSensor_defaults"
+local capabilities = require "st.capabilities"
 
 local MULTI_SENSOR_FINGERPRINTS = {
   { mfr = "CentraLite", model = "3320" },
   { mfr = "CentraLite", model = "3321" },
   { mfr = "CentraLite", model = "3321-S" },
   { mfr = "SmartThings", model = "multiv4" },
-  { mfr = "Samjin", model = "multi" }
+  { mfr = "Samjin", model = "multi" },
+  { mfr = "Third Reality, Inc", model = "3RVS01031Z" }
 }
 
 local function can_handle_zigbee_multi_sensor(opts, driver, device, ...)
@@ -94,7 +95,8 @@ local multi_sensor = {
   sub_drivers = {
     require("multi-sensor/smartthings-multi"),
     require("multi-sensor/samjin-multi"),
-    require("multi-sensor/centralite-multi")
+    require("multi-sensor/centralite-multi"),
+    require("multi-sensor/thirdreality-multi")
   },
   can_handle = can_handle_zigbee_multi_sensor
 }

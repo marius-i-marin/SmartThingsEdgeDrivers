@@ -21,6 +21,8 @@ local ZwaveDriver = require "st.zwave.driver"
 local defaults = require "st.zwave.defaults"
 --- @type st.zwave.CommandClass.Basic
 local Basic = (require "st.zwave.CommandClass.Basic")({ version=1 })
+--- @type st.zwave.CommandClass.WakeUp
+local WakeUp = (require "st.zwave.CommandClass.WakeUp")({ version = 1 })
 
 local preferences = require "preferences"
 local configurations = require "configurations"
@@ -57,6 +59,16 @@ local function basic_set_handler(driver, device, cmd)
       device:emit_event_for_endpoint(cmd.src_channel, capabilities.motionSensor.motion.inactive())
     end
   end
+end
+
+local function wakeup_notification(driver, device, cmd)
+  --Note sending WakeUpIntervalGet the first time a device wakes up will happen by default in Lua libs 0.49.x and higher
+  --This is done to help the hub correctly set the checkInterval for migrated devices.
+  if not device:get_field("__wakeup_interval_get_sent") then
+    device:send(WakeUp:IntervalGetV1({}))
+    device:set_field("__wakeup_interval_get_sent", true)
+  end
+  device:refresh()
 end
 
 local function do_configure(driver, device)
@@ -113,7 +125,7 @@ local driver_template = {
     require("zooz-4-in-1-sensor"),
     require("vision-motion-detector"),
     require("fibaro-flood-sensor"),
-    require("zwave-water-temp-humidity-sensor"),
+    require("aeotec-water-sensor"),
     require("glentronics-water-leak-sensor"),
     require("homeseer-multi-sensor"),
     require("fibaro-door-window-sensor"),
@@ -123,7 +135,11 @@ local driver_template = {
     require("zwave-water-leak-sensor"),
     require("everspring-motion-light-sensor"),
     require("ezmultipli-multipurpose-sensor"),
-    require("fibaro-motion-sensor")
+    require("fibaro-motion-sensor"),
+    require("v1-contact-event"),
+    require("timed-tamper-clear"),
+    require("wakeup-no-poll"),
+    require("apiv6_bugfix")
   },
   lifecycle_handlers = {
     added = added_handler,
@@ -134,6 +150,9 @@ local driver_template = {
   zwave_handlers = {
     [cc.BASIC] = {
       [Basic.SET] = basic_set_handler
+    },
+    [cc.WAKE_UP] = {
+      [WakeUp.NOTIFICATION] = wakeup_notification
     }
   },
 }

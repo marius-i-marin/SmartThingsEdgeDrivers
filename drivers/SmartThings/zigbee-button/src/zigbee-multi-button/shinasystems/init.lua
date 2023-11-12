@@ -14,11 +14,10 @@
 
 local capabilities = require "st.capabilities"
 local clusters = require "st.zigbee.zcl.clusters"
-local device_management = require "st.zigbee.device_management"
 local battery_defaults = require "st.zigbee.defaults.battery_defaults"
-
-local OnOff = clusters.OnOff
 local PowerConfiguration = clusters.PowerConfiguration
+local OnOff = clusters.OnOff
+local Groups = clusters.Groups
 
 local SHINASYSTEM_BUTTON_FINGERPRINTS = {
   { mfr = "ShinaSystem", model = "MSM-300Z" },
@@ -28,19 +27,11 @@ local SHINASYSTEM_BUTTON_FINGERPRINTS = {
   { mfr = "ShinaSystem", model = "SBM300ZB3" },
 }
 
-local SHINASYSTEM_NUM_EP_MAP = {
-  ["MSM-300Z"] = 4,
-  ["BSM-300Z"] = 1,
-  ["SBM300ZB1"] = 1,
-  ["SBM300ZB2"] = 2,
-  ["SBM300ZB3"] = 3,
-}
-
 local is_shinasystem_button = function(opts, driver, device)
   for _, fingerprint in ipairs(SHINASYSTEM_BUTTON_FINGERPRINTS) do
-      if device:get_manufacturer() == fingerprint.mfr and device:get_model() == fingerprint.model then
-          return true
-      end
+    if device:get_manufacturer() == fingerprint.mfr and device:get_model() == fingerprint.model then
+      return true
+    end
   end
   return false
 end
@@ -62,10 +53,18 @@ local function build_button_handler(pressed_type)
   end
 end
 
+local do_configure = function(self, device)
+  device:configure()
+  device:send(PowerConfiguration.attributes.BatteryVoltage:read(device))
+  self:add_hub_to_zigbee_group(0x0000)
+  device:send(Groups.commands.AddGroup(device, 0x0000))
+end
+
 local shinasystem_device_handler = {
   NAME = "ShinaSystem Device Handler",
   lifecycle_handlers = {
     init = battery_defaults.build_linear_voltage_init(2.1, 3.0),
+    doConfigure = do_configure
   },
   zigbee_handlers = {
     cluster = {

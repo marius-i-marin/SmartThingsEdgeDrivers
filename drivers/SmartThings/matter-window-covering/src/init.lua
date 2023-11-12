@@ -12,18 +12,36 @@
 -- See the License for the specific language governing permissions and
 -- limitations under the License.
 
+--Note: Currently only support for window shades with the PositionallyAware Feature
+--Note: No support for setting device into calibration mode, it must be done manually
 local capabilities = require "st.capabilities"
 local log = require "log"
 local clusters = require "st.matter.clusters"
-local im = require "st.matter.interaction_model"
 local MatterDriver = require "st.matter.driver"
 
--- Not sure if I need status yet
--- local global variables
 local DEFAULT_LEVEL = 0
-local OPERATIONAL_STATUS_MASK = 0x3 -- only check the last two bits
+
+local function find_default_endpoint(device, cluster)
+  local res = device.MATTER_DEFAULT_ENDPOINT
+  local eps = device:get_endpoints(cluster)
+  table.sort(eps)
+  for _, v in ipairs(eps) do
+    if v ~= 0 then --0 is the matter RootNode endpoint
+      return v
+    end
+  end
+  device.log.warn(string.format("Did not find default endpoint, will use endpoint %d instead", device.MATTER_DEFAULT_ENDPOINT))
+  return res
+end
+
+local function component_to_endpoint(device, component_name)
+  -- Use the find_default_endpoint function to return the first endpoint that
+  -- supports a given cluster.
+  return find_default_endpoint(device, clusters.WindowCovering.ID)
+end
 
 local function device_init(driver, device)
+  device:set_component_to_endpoint_fn(component_to_endpoint)
   device:subscribe()
 end
 
@@ -36,14 +54,14 @@ end
 local function device_removed(driver, device) log.info("device removed") end
 
 -- capability handlers
-
 local function handle_preset(driver, device, cmd)
   local endpoint_id = device:component_to_endpoint(cmd.component)
   local lift_value = 100 - device.preferences.presetPosition
   local hundredths_lift_percent = lift_value * 100
   local req = clusters.WindowCovering.server.commands.GoToLiftPercentage(
-                device, endpoint_id, lift_value, hundredths_lift_percent
+                device, endpoint_id, hundredths_lift_percent
               )
+
   device:send(req)
 end
 
@@ -75,9 +93,8 @@ local function handle_shade_level(driver, device, cmd)
   local lift_percentage_value = 100 - cmd.args.shadeLevel
   local hundredths_lift_percentage = lift_percentage_value * 100
   local req = clusters.WindowCovering.server.commands.GoToLiftPercentage(
-                device, endpoint_id, lift_percentage_value, hundredths_lift_percentage
+                device, endpoint_id, hundredths_lift_percentage
               )
-
   device:send(req)
 end
 
@@ -85,7 +102,6 @@ end
 local function current_pos_handler(driver, device, ib, response)
   if ib.data.value ~= nil then
     local position = 100 - math.floor((ib.data.value / 100))
-    
     device:emit_event_for_endpoint(
       ib.endpoint_id, capabilities.windowShadeLevel.shadeLevel(position)
     )
@@ -100,28 +116,25 @@ local function current_status_handler(driver, device, ib, response)
                        capabilities.windowShadeLevel.shadeLevel.NAME
                    ) or DEFAULT_LEVEL
   for _, rb in ipairs(response.info_blocks) do
-    if rb.info_block.attribute_id == clusters.WindowCovering.attributes.CurrentPositionLiftPercent100ths.ID and 
-       rb.info_block.cluster_id == clusters.WindowCovering.ID then
+    if rb.info_block.attribute_id == clusters.WindowCovering.attributes.CurrentPositionLiftPercent100ths.ID and
+       rb.info_block.cluster_id == clusters.WindowCovering.ID and
+       rb.info_block.data.value ~= nil then
       position = 100 - math.floor((rb.info_block.data.value / 100))
     end
   end
-  local state = ib.data.value & OPERATIONAL_STATUS_MASK -- get last two bits
-
-  if ib.data.value ~= nil then
-    if state == 0 then -- not moving
-      if position == 100 then -- open
-        device:emit_event_for_endpoint(ib.endpoint_id, attr.open())
-      elseif position == 0 then -- closed
-        device:emit_event_for_endpoint(ib.endpoint_id, attr.closed())
-      else
-        device:emit_event_for_endpoint(ib.endpoint_id, attr.partially_open())
-      end
-    elseif state == 1 then -- opening
-      device:emit_event_for_endpoint(ib.endpoint_id, attr.opening())
-    elseif state == 2 then ---closing 
-      device:emit_event_for_endpoint(ib.endpoint_id, attr.closing())
+  local state = ib.data.value & clusters.WindowCovering.types.OperationalStatus.GLOBAL --Could use LIFT instead
+  if state == 0 then -- not moving
+    if position == 100 then -- open
+      device:emit_event_for_endpoint(ib.endpoint_id, attr.open())
+    elseif position == 0 then -- closed
+      device:emit_event_for_endpoint(ib.endpoint_id, attr.closed())
+    else
+      device:emit_event_for_endpoint(ib.endpoint_id, attr.partially_open())
     end
-
+  elseif state == 1 then -- opening
+    device:emit_event_for_endpoint(ib.endpoint_id, attr.opening())
+  elseif state == 2 then -- closing
+    device:emit_event_for_endpoint(ib.endpoint_id, attr.closing())
   else
     device:emit_event_for_endpoint(ib.endpoint_id, attr.unknown())
   end
@@ -129,8 +142,9 @@ end
 
 local function level_attr_handler(driver, device, ib, response)
   if ib.data.value ~= nil then
+    --TODO should we invert this like we do for CurrentLiftPercentage100ths?
     local level = math.floor((ib.data.value / 254.0 * 100) + 0.5)
-    device:emit_event_for_endpoint(ib.endpoint_id, capabilities.windowShadeLevel.shadeLevel(level)) 
+    device:emit_event_for_endpoint(ib.endpoint_id, capabilities.windowShadeLevel.shadeLevel(level))
   end
 end
 
@@ -145,6 +159,8 @@ local matter_driver_template = {
   lifecycle_handlers = {init = device_init, removed = device_removed, added = device_added},
   matter_handlers = {
     attr = {
+      --TODO LevelControl may not be needed for certified devices since
+      -- certified should use CurrentPositionLiftPercent100ths attr
       [clusters.LevelControl.ID] = {
         [clusters.LevelControl.attributes.CurrentLevel.ID] = level_attr_handler,
       },
@@ -171,7 +187,9 @@ local matter_driver_template = {
     }
   },
   capability_handlers = {
-    [capabilities.refresh.ID] = {[capabilities.refresh.commands.refresh.NAME] = handle_refresh},
+    [capabilities.refresh.ID] = {
+      [capabilities.refresh.commands.refresh.NAME] = nil --TODO: define me!
+    },
     [capabilities.windowShadePreset.ID] = {
       [capabilities.windowShadePreset.commands.presetPosition.NAME] = handle_preset,
     },
@@ -183,6 +201,12 @@ local matter_driver_template = {
     [capabilities.windowShadeLevel.ID] = {
       [capabilities.windowShadeLevel.commands.setShadeLevel.NAME] = handle_shade_level,
     },
+  },
+  supported_capabilities = {
+    capabilities.windowShadeLevel,
+    capabilities.windowShade,
+    capabilities.windowShadePreset,
+    capabilities.battery,
   },
 }
 

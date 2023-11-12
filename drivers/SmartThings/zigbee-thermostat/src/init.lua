@@ -1,4 +1,4 @@
--- Copyright 2022 SmartThings
+-- Copyright 2023 SmartThings
 --
 -- Licensed under the Apache License, Version 2.0 (the "License");
 -- you may not use this file except in compliance with the License.
@@ -189,7 +189,7 @@ local set_setpoint_factory = function(setpoint_attribute)
     if (value >= 40) then -- assume this is a fahrenheit value
       value = utils.f_to_c(value)
     end
-    device:send_to_component(command.component, setpoint_attribute:write(device, value*100))
+    device:send_to_component(command.component, setpoint_attribute:write(device, utils.round(value*100)))
 
     device.thread:call_with_delay(2, function(d)
       device:send_to_component(command.component, setpoint_attribute:read(device))
@@ -204,7 +204,6 @@ local do_refresh = function(self, device)
     Thermostat.attributes.LocalTemperature,
     Thermostat.attributes.ControlSequenceOfOperation,
     Thermostat.attributes.ThermostatRunningState,
-    Thermostat.attributes.ThermostatRunningMode,
     Thermostat.attributes.SystemMode,
     FanControl.attributes.FanModeSequence,
     FanControl.attributes.FanMode,
@@ -293,7 +292,9 @@ local zigbee_thermostat_driver = {
     require("stelpro"),
     require("lux-konoz"),
     require("leviton"),
-    require("popp_danfoss")
+    require("danfoss"),
+    require("popp"),
+    require("vimar")
   },
 }
 
